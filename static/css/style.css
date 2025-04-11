@@ -1,0 +1,146 @@
+/* Custom Styles */
+:root {
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --info-color: #0dcaf0;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+}
+
+/* General Styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+}
+
+/* Card Styles */
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+/* Button Styles */
+.btn {
+    border-radius: 0.25rem;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+/* Form Styles */
+.form-control {
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Progress Bar Styles */
+.progress {
+    height: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.progress-bar {
+    background-color: var(--primary-color);
+}
+
+/* Alert Styles */
+.alert {
+    border-radius: 0.25rem;
+    border: none;
+}
+
+/* Table Styles */
+.table {
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.table thead th {
+    background-color: var(--light-color);
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Audio Player Styles */
+.audio-player {
+    width: 100%;
+    background-color: var(--light-color);
+    border-radius: 0.25rem;
+    padding: 1rem;
+}
+
+/* File Upload Styles */
+.file-upload {
+    border: 2px dashed #dee2e6;
+    border-radius: 0.25rem;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.file-upload:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* Job Status Styles */
+.job-status {
+    padding: 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.job-status.pending {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid var(--warning-color);
+}
+
+.job-status.processing {
+    background-color: rgba(13, 202, 240, 0.1);
+    border-left: 4px solid var(--info-color);
+}
+
+.job-status.completed {
+    background-color: rgba(25, 135, 84, 0.1);
+    border-left: 4px solid var(--success-color);
+}
+
+.job-status.failed {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-left: 4px solid var(--danger-color);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+} 

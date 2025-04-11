@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Doc2Audiobook{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">
+                    <i class="fas fa-book-audio text-primary me-2"></i>Convert Documents to Audiobooks
+                </h2>
+                <p class="card-text text-center text-muted mb-4">
+                    Upload your document and we'll convert it into a high-quality audiobook with natural-sounding voices.
+                </p>
+                
+                <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" class="mb-4">
+                    <div class="file-upload mb-3" id="dropZone">
+                        <input type="file" name="file" id="fileInput" class="d-none" accept=".docx,.pdf,.txt">
+                        <div class="text-center">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                            <h5>Drag and drop your file here</h5>
+                            <p class="text-muted">or</p>
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                Browse Files
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="voice" class="form-label">Voice</label>
+                            <select class="form-select" id="voice" name="voice" required>
+                                <option value="alloy">Alloy</option>
+                                <option value="echo">Echo</option>
+                                <option value="fable">Fable</option>
+                                <option value="onyx">Onyx</option>
+                                <option value="nova">Nova</option>
+                                <option value="shimmer">Shimmer</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="model" class="form-label">Model</label>
+                            <select class="form-select" id="model" name="model" required>
+                                <option value="tts-1">Standard</option>
+                                <option value="tts-1-hd">High Definition</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play me-2"></i>Start Conversion
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title mb-4">
+                    <i class="fas fa-history me-2"></i>Recent Conversions
+                </h3>
+                {% if recent_jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in recent_jobs %}
+                                    <tr>
+                                        <td>{{ job.filename }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ job.status_color }}">
+                                                {{ job.status }}
+                                            </span>
+                                        </td>
+                                        <td>{{ job.date }}</td>
+                                        <td>
+                                            {% if job.status == 'completed' %}
+                                                <a href="{{ url_for('download', job_id=job.id) }}" class="btn btn-sm btn-success">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-center text-muted">No recent conversions</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    
+    // Handle drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-primary');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-primary');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-primary');
+        fileInput.files = e.dataTransfer.files;
+    });
+    
+    // Handle file input change
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            dropZone.querySelector('h5').textContent = fileInput.files[0].name;
+        }
+    });
+});
+</script>
+{% endblock %} 

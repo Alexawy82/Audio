@@ -1,0 +1,475 @@
+{% extends "base.html" %}
+
+{% block title %}Job Status - {{ job.filename }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <!-- Job Status Card -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">
+                        <i class="bi bi-file-earmark-text me-2"></i>{{ job.filename }}
+                    </h5>
+                </div>
+                <span class="badge {{ 'bg-success' if job.status == 'completed' else 'bg-warning' if job.status == 'processing' else 'bg-danger' }}">
+                    {% if job.status == 'completed' %}
+                        <i class="bi bi-check-circle me-1"></i>
+                    {% elif job.status == 'processing' %}
+                        <i class="bi bi-hourglass-split me-1"></i>
+                    {% else %}
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                    {% endif %}
+                    {{ job.status|title }}
+                </span>
+            </div>
+            
+            <div class="card-body">
+                {% if job.status == 'processing' %}
+                <!-- Processing Status -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Progress</h6>
+                        <span class="text-muted">{{ job.progress }}%</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" 
+                             style="width: {{ job.progress }}%"
+                             aria-valuenow="{{ job.progress }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                    <p class="mt-3 mb-0">
+                        <i class="bi bi-arrow-repeat me-2"></i>
+                        <span id="current-step">{{ job.current_step }}</span>
+                    </p>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    This page will automatically refresh every 10 seconds until processing is complete.
+                </div>
+                {% endif %}
+                
+                {% if job.status == 'completed' %}
+                <!-- Generated Files -->
+                <h6 class="mb-3"><i class="bi bi-collection me-2"></i>Generated Audio Files</h6>
+                
+                {% if job.result.output_files|selectattr('name', 'equalto', 'complete_audiobook.mp3')|list %}
+                <!-- Complete Audiobook Card -->
+                {% set complete_file = job.result.output_files|selectattr('name', 'equalto', 'complete_audiobook.mp3')|first %}
+                <div class="card mb-4 file-item file-item-active" id="complete-file">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="fs-3 me-3 text-primary">
+                                <i class="bi bi-file-earmark-music"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h5 class="mb-0">Complete Audiobook</h5>
+                                <p class="text-muted mb-0">
+                                    <small>
+                                        <i class="bi bi-clock me-1"></i> {{ complete_file.duration_formatted }} | 
+                                        <i class="bi bi-hdd me-1"></i> {{ complete_file.size_formatted }}
+                                    </small>
+                                </p>
+                            </div>
+                            <div>
+                                <div class="btn-group">
+                                    <button class="btn btn-primary btn-sm" 
+                                            onclick="playAudio('{{ complete_file.name }}', 'Complete Audiobook')">
+                                        <i class="bi bi-play-fill me-1"></i> Play
+                                    </button>
+                                    <a href="{{ url_for('download_file', job_id=job.id, filename=complete_file.name) }}" 
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-download me-1"></i> Download
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Player for Complete Audiobook -->
+                        <div class="custom-audio-player mt-3 d-none" id="player-complete-file">
+                            <div class="audio-player-container">
+                                <audio id="audio-complete-file" 
+                                       src="{{ url_for('download_file', job_id=job.id, filename=complete_file.name, play=1) }}" 
+                                       preload="none" 
+                                       class="w-100" 
+                                       controls></audio>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Individual Chapters List -->
+                <h6 class="mt-4 mb-3"><i class="bi bi-list-ol me-2"></i>Individual Chapters</h6>
+                <div class="list-group mb-4">
+                    {% for file in job.result.output_files %}
+                    {% if file.name != 'complete_audiobook.mp3' and file.name|lower is not containing('.json') %}
+                    <div class="list-group-item file-item p-3" id="file-{{ loop.index }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="bi bi-music-note-beamed me-2"></i>{{ file.name }}
+                                </h6>
+                                <small class="text-muted">
+                                    <i class="bi bi-clock me-1"></i> {{ file.duration_formatted }} | 
+                                    <i class="bi bi-hdd me-1"></i> {{ file.size_formatted }}
+                                </small>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-primary me-2" 
+                                        onclick="togglePlay('file-{{ loop.index }}', '{{ file.name }}')">
+                                    <i class="bi bi-play-fill me-1"></i> Play
+                                </button>
+                                <a href="{{ url_for('download_file', job_id=job.id, filename=file.name) }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Inline audio player (initially hidden) -->
+                        <div class="mt-3 d-none player-container" id="player-file-{{ loop.index }}">
+                            <div class="audio-player-container">
+                                <audio id="audio-file-{{ loop.index }}" 
+                                       data-filename="{{ file.name }}"
+                                       preload="none" 
+                                       class="w-100" 
+                                       controls></audio>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                
+                <!-- Download All Button -->
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('download_all', job_id=job.id) }}" class="btn btn-primary">
+                        <i class="bi bi-download me-2"></i>Download All Files (ZIP)
+                    </a>
+                </div>
+                {% endif %}
+                
+                {% if job.status == 'failed' %}
+                <!-- Error Information -->
+                <div class="alert alert-danger mb-4">
+                    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle me-2"></i>Error</h6>
+                    <p class="mb-0">{{ job.error }}</p>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="bi bi-arrow-left me-2"></i>Return to Homepage
+                    </a>
+                </div>
+                {% endif %}
+                
+                <!-- Job Details -->
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="text-muted mb-3"><i class="bi bi-info-circle me-2"></i>Job Details</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Job ID:</strong><br>
+                                <small class="text-muted">{{ job.id }}</small>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Start Time:</strong><br>
+                                <small class="text-muted">{{ job.start_time|datetime }}</small>
+                            </p>
+                        </div>
+                        {% if job.end_time %}
+                        <div class="col-md-6">
+                            <p class="mb-0">
+                                <strong>Completion Time:</strong><br>
+                                <small class="text-muted">{{ job.end_time|datetime }}</small>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-0">
+                                <strong>Processing Duration:</strong><br>
+                                <small class="text-muted" id="processingTime">
+                                    {% if job.start_time and job.end_time %}
+                                    {{ ((job.end_time|int) - (job.start_time|int)) // 60 }} min 
+                                    {{ ((job.end_time|int) - (job.start_time|int)) % 60 }} sec
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </small>
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Improved Audio Player Modal -->
+<div class="modal fade" id="audioPlayerModal" tabindex="-1" aria-labelledby="audioPlayerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="audioPlayerModalLabel">
+                    <i class="bi bi-music-note-beamed me-2"></i>
+                    <span id="audioPlayerTitle">Audio Player</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading State -->
+                <div id="loadingIndicator" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 mb-0">Loading audio file...</p>
+                </div>
+                
+                <!-- Audio Visualization & Player -->
+                <div id="audioPlayerContainer" class="d-none">
+                    <div class="audio-visualization mb-3">
+                        <div class="bg-light rounded p-3">
+                            <div class="audio-waveform" id="waveform" style="height: 80px;"></div>
+                        </div>
+                    </div>
+                    
+                    <audio id="modalAudioPlayer" class="w-100" controls>
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+                
+                <!-- Error State -->
+                <div id="audioErrorMessage" class="alert alert-danger d-none">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Error loading the audio file. Please try downloading it instead.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a id="modalDownloadButton" href="#" class="btn btn-primary">
+                    <i class="bi bi-download me-1"></i> Download
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// File player state tracking
+let activePlayers = {};
+
+// Track playing audio element
+let currentlyPlaying = null;
+
+// Toggle play/pause for inline players
+function togglePlay(fileId, filename) {
+    const playerContainer = document.getElementById(`player-${fileId}`);
+    const audioElement = document.getElementById(`audio-${fileId}`);
+    const allFilesItems = document.querySelectorAll('.file-item');
+    const fileItem = document.getElementById(fileId);
+    
+    // If this player is not active yet
+    if (playerContainer.classList.contains('d-none')) {
+        // Hide any other active players
+        document.querySelectorAll('.player-container').forEach(container => {
+            if (container !== playerContainer) {
+                container.classList.add('d-none');
+            }
+        });
+        
+        // Reset all file items
+        allFilesItems.forEach(item => {
+            item.classList.remove('file-item-active');
+        });
+        
+        // Show this player and mark file as active
+        playerContainer.classList.remove('d-none');
+        fileItem.classList.add('file-item-active');
+        
+        // Set source if not already set
+        if (!audioElement.src || audioElement.src === 'about:blank') {
+            // Set source with play parameter
+            audioElement.src = `/download/{{ job.id }}/${filename}?play=1`;
+            
+            // Set up event handlers
+            setupAudioEvents(audioElement, fileId);
+        }
+        
+        // Play the audio
+        audioElement.play()
+            .catch(error => {
+                console.error("Error playing audio:", error);
+                playerContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Error playing audio. Please try downloading instead.
+                    </div>
+                `;
+            });
+    } else {
+        // Player is already visible, toggle play/pause
+        if (audioElement.paused) {
+            audioElement.play();
+        } else {
+            audioElement.pause();
+        }
+    }
+}
+
+// Set up audio element event handlers
+function setupAudioEvents(audioElement, elementId) {
+    // Pause other playing audio when this one plays
+    audioElement.addEventListener('play', function() {
+        if (currentlyPlaying && currentlyPlaying !== audioElement) {
+            currentlyPlaying.pause();
+        }
+        currentlyPlaying = audioElement;
+        
+        // Update button icon for all players
+        updatePlayButtonIcons();
+    });
+    
+    // Update button icons when paused
+    audioElement.addEventListener('pause', function() {
+        if (currentlyPlaying === audioElement) {
+            currentlyPlaying = null;
+        }
+        updatePlayButtonIcons();
+    });
+    
+    // Handle errors
+    audioElement.addEventListener('error', function() {
+        console.error(`Error playing audio ${elementId}:`, audioElement.error);
+        const playerContainer = document.getElementById(`player-${elementId}`);
+        playerContainer.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Error playing audio. Please try downloading instead.
+            </div>
+        `;
+    });
+}
+
+// Update play/pause button icons for all players
+function updatePlayButtonIcons() {
+    // TODO: Implement this if we add explicit play/pause buttons
+}
+
+// Play audio in the modal player
+function playAudio(filename, title) {
+    const modalAudioPlayer = document.getElementById('modalAudioPlayer');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const audioPlayerContainer = document.getElementById('audioPlayerContainer');
+    const audioErrorMessage = document.getElementById('audioErrorMessage');
+    const audioPlayerTitle = document.getElementById('audioPlayerTitle');
+    const modalDownloadButton = document.getElementById('modalDownloadButton');
+    
+    // Update UI
+    audioPlayerTitle.textContent = title || filename;
+    loadingIndicator.classList.remove('d-none');
+    audioErrorMessage.classList.add('d-none');
+    audioPlayerContainer.classList.add('d-none');
+    
+    // Set download link
+    const downloadUrl = `/download/{{ job.id }}/${filename}`;
+    modalDownloadButton.href = downloadUrl;
+    
+    // Use the download route URL for streaming
+    const streamUrl = `${downloadUrl}?play=1`;
+    
+    console.log("Playing audio from:", streamUrl);
+    
+    // Set up audio player
+    modalAudioPlayer.src = streamUrl;
+    modalAudioPlayer.load(); // Force reload
+    
+    // Set up event listeners
+    modalAudioPlayer.oncanplay = function() {
+        // Hide loading indicator and show audio player when ready
+        loadingIndicator.classList.add('d-none');
+        audioPlayerContainer.classList.remove('d-none');
+        modalAudioPlayer.play()
+            .catch(error => {
+                console.error("Error playing audio:", error);
+                audioErrorMessage.classList.remove('d-none');
+                audioPlayerContainer.classList.add('d-none');
+            });
+    };
+    
+    modalAudioPlayer.onerror = function() {
+        console.error("Error loading audio:", modalAudioPlayer.error);
+        loadingIndicator.classList.add('d-none');
+        audioErrorMessage.classList.remove('d-none');
+        audioPlayerContainer.classList.add('d-none');
+    };
+    
+    // Set a timeout in case loading takes too long
+    setTimeout(() => {
+        if (!loadingIndicator.classList.contains('d-none')) {
+            loadingIndicator.classList.add('d-none');
+            audioErrorMessage.classList.remove('d-none');
+        }
+    }, 15000); // 15 seconds timeout
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('audioPlayerModal'));
+    modal.show();
+    
+    // When modal is hidden, pause audio
+    document.getElementById('audioPlayerModal').addEventListener('hidden.bs.modal', function() {
+        modalAudioPlayer.pause();
+    });
+}
+
+// When the complete audiobook card is clicked, toggle the player
+document.addEventListener('DOMContentLoaded', function() {
+    const completeFile = document.getElementById('complete-file');
+    if (completeFile) {
+        completeFile.addEventListener('click', function(e) {
+            // Only handle clicks on the card itself, not on buttons
+            if (!e.target.closest('button') && !e.target.closest('a')) {
+                const player = document.getElementById('player-complete-file');
+                const audio = document.getElementById('audio-complete-file');
+                
+                if (player.classList.contains('d-none')) {
+                    player.classList.remove('d-none');
+                    if (!audio.src || audio.src.includes('about:blank')) {
+                        audio.load();
+                    }
+                } else {
+                    player.classList.add('d-none');
+                    audio.pause();
+                }
+            }
+        });
+    }
+});
+
+// Auto-refresh page every 10 seconds if job is processing
+{% if job.status == 'processing' %}
+let refreshCount = 0;
+const refreshInterval = setInterval(function() {
+    refreshCount++;
+    // After 5 minutes (30 refreshes at 10 second intervals), slow down to 30 seconds
+    if (refreshCount > 30) {
+        clearInterval(refreshInterval);
+        setInterval(function() {
+            window.location.reload();
+        }, 30000);
+    } else {
+        window.location.reload();
+    }
+}, 10000);
+{% endif %}
+</script>
+{% endblock %}

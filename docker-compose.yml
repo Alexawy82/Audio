@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  doctoaudiobook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      - PORT=5000
+      - HOST=0.0.0.0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEBUG=false
+      - MAX_UPLOAD_SIZE=104857600  # 100MB
+      - SECRET_KEY=${SECRET_KEY:-$(openssl rand -hex 32)}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped 

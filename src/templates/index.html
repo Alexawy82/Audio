@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}DocToAudiobook Converter{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        {% if not api_configured %}
+        <div class="alert alert-warning" role="alert">
+            <strong>API Key Not Configured!</strong> Please <a href="{{ url_for('api_config') }}">configure your OpenAI API key</a> before using the converter.
+        </div>
+        {% endif %}
+        
+        <!-- Upload Form -->
+        <div class="card">
+            <div class="card-header">
+                Convert Document to Audiobook
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" id="uploadForm">
+                    <!-- File Upload -->
+                    <div class="mb-4">
+                        <label for="file" class="form-label">Upload Document (DOCX or PDF)</label>
+                        <div class="upload-box" id="uploadBox">
+                            <div class="upload-icon">
+                                <i class="bi bi-cloud-arrow-up"></i>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-cloud-upload" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M4.406 1.342A5.53 5.53 0 0 1 8 0c2.69 0 4.923 2 5.166 4.579C14.758 4.804 16 6.137 16 7.773 16 9.569 14.502 11 12.687 11H10a.5.5 0 0 1 0-1h2.688C13.979 10 15 8.988 15 7.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 2.825 10.328 1 8 1a4.53 4.53 0 0 0-2.941 1.1c-.757.652-1.153 1.438-1.153 2.055v.448l-.445.049C2.064 4.805 1 5.952 1 7.318 1 8.785 2.23 10 3.781 10H6a.5.5 0 0 1 0 1H3.781C1.708 11 0 9.366 0 7.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
+                                    <path fill-rule="evenodd" d="M7.646 4.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V14.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                                </svg>
+                            </div>
+                            <h5>Click here or drag & drop file</h5>
+                            <p class="text-muted">Supports DOCX and PDF files up to 50MB</p>
+                        </div>
+                        <input type="file" name="file" id="fileInput" class="hidden" accept=".docx,.pdf" required>
+                        <div id="fileDetails" class="hidden mt-2 alert alert-info">
+                            <span id="fileName"></span>
+                            <button type="button" class="btn-close float-end" id="removeFile"></button>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Voice Settings -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="model" class="form-label">TTS Model</label>
+                                <select name="model" id="model" class="form-select" required>
+                                    {% for model in models %}
+                                        <option value="{{ model.id }}" {% if model.id == voice_settings.model %}selected{% endif %}>
+                                            {{ model.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="voice_id" class="form-label">Voice</label>
+                                <select name="voice_id" id="voice_id" class="form-select" required>
+                                    {% for voice in voices %}
+                                        <option value="{{ voice.id }}" {% if voice.id == voice_settings.voice_id %}selected{% endif %}>
+                                            {{ voice.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Additional Settings -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="speed" class="form-label">Speed (0.25 - 4.0)</label>
+                                <input type="number" name="speed" id="speed" class="form-control" 
+                                       min="0.25" max="4.0" step="0.05" value="{{ voice_settings.speed }}" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="style" class="form-label">Voice Style</label>
+                                <select name="style" id="style" class="form-select">
+                                    {% for preset in style_presets %}
+                                        <option value="{{ preset.id }}" {% if preset.id == voice_settings.style %}selected{% endif %}>
+                                            {{ preset.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Custom Style & Emotion (visible conditionally) -->
+                    <div class="mb-3" id="customStyleContainer" style="display: none;">
+                        <label for="custom_style" class="form-label">Custom Style Instructions</label>
+                        <input type="text" name="custom_style" id="custom_style" class="form-control" 
+                               placeholder="e.g., Speak like a mad scientist" value="{{ voice_settings.style if voice_settings.style not in style_presets }}">
+                        <div class="form-text">For use with gpt-4o-mini-tts model. Enter natural language instructions for voice style.</div>
+                    </div>
+                    
+                    <div class="mb-3" id="emotionContainer" style="display: none;">
+                        <label for="emotion" class="form-label">Emotional Tone</label>
+                        <input type="text" name="emotion" id="emotion" class="form-control" 
+                               placeholder="e.g., excited, calm, serious" value="{{ voice_settings.emotion or '' }}">
+                        <div class="form-text">For use with gpt-4o-mini-tts model. Specify an emotional quality for the voice.</div>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn" {% if not api_configured %}disabled{% endif %}>
+                            Convert to Audiobook
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Files & Preview Column -->
+    <div class="col-md-4">
+        <!-- Preview Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                Voice Preview
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="previewText" class="form-label">Sample Text</label>
+                    <textarea id="previewText" class="form-control" rows="3">This is a sample of the voice that will be used for your audiobook.</textarea>
+                </div>
+                <button type="button" class="btn btn-outline-primary w-100" id="previewBtn" {% if not api_configured %}disabled{% endif %}>
+                    Preview Voice
+                </button>
+                <div class="mt-3 hidden" id="previewPlayer">
+                    <audio controls class="w-100" id="audioPlayer">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Files -->
+        <div class="card">
+            <div class="card-header">
+                Recent Conversions
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush recent-files">
+                    {% if recent_files %}
+                    {% for file_path in recent_files %}
+                    <li class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ file_path.split('/')[-1] }}</h6>
+                        </div>
+                        <p class="mb-1 text-truncate small text-muted">{{ file_path }}</p>
+                    </li>
+                    {% endfor %}
+                    {% else %}
+                    <li class="list-group-item text-center text-muted py-4">
+                        No recent conversions found
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // File Upload Handling
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const fileDetails = document.getElementById('fileDetails');
+        const fileName = document.getElementById('fileName');
+        const removeFile = document.getElementById('removeFile');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        uploadBox.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        uploadBox.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadBox.classList.add('border-primary');
+        });
+        
+        uploadBox.addEventListener('dragleave', function() {
+            uploadBox.classList.remove('border-primary');
+        });
+        
+        uploadBox.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadBox.classList.remove('border-primary');
+            
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelection();
+            }
+        });
+        
+        fileInput.addEventListener('change', handleFileSelection);
+        
+        function handleFileSelection() {
+            if (fileInput.files.length) {
+                const file = fileInput.files[0];
+                
+                // Check file type
+                const fileExt = file.name.split('.').pop().toLowerCase();
+                if (!['docx', 'pdf'].includes(fileExt)) {
+                    alert('Please select a DOCX or PDF file.');
+                    resetFileInput();
+                    return;
+                }
+                
+                // Check file size (50MB max)
+                if (file.size > 50 * 1024 * 1024) {
+                    alert('File size exceeds the 50MB limit.');
+                    resetFileInput();
+                    return;
+                }
+                
+                // Update UI
+                fileName.textContent = file.name + ' (' + formatFileSize(file.size) + ')';
+                fileDetails.classList.remove('hidden');
+                uploadBox.classList.add('hidden');
+                
+                // Enable submit button if API is configured
+                const apiIsConfigured = {{ 'true' if api_configured else 'false' }};
+                if (apiIsConfigured) {
+                    submitBtn.disabled = false;
+                }
+            }
+        }
+        
+        removeFile.addEventListener('click', function() {
+            resetFileInput();
+        });
+        
+        function resetFileInput() {
+            fileInput.value = '';
+            fileDetails.classList.add('hidden');
+            uploadBox.classList.remove('hidden');
+            const apiIsConfigured = {{ 'true' if api_configured else 'false' }};
+            submitBtn.disabled = !apiIsConfigured;
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' bytes';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        // Model and Style Selection Logic
+        const modelSelect = document.getElementById('model');
+        const styleSelect = document.getElementById('style');
+        const customStyleContainer = document.getElementById('customStyleContainer');
+        const emotionContainer = document.getElementById('emotionContainer');
+        
+        function updateStyleOptions() {
+            // const selectedModel = modelSelect.value;
+            // Always enable style options regardless of model
+            // const isSteerableModel = true; // Keep this true
+            const isCustomStyle = styleSelect.value === 'custom';
+            
+            // Update UI based on style selection
+            // Show custom input only if 'custom' is selected
+            customStyleContainer.style.display = isCustomStyle ? 'block' : 'none';
+            // Always show emotion input
+            emotionContainer.style.display = 'block'; 
+            
+            // Always enable style dropdown
+            styleSelect.disabled = false;
+        }
+        
+        modelSelect.addEventListener('change', updateStyleOptions);
+        styleSelect.addEventListener('change', updateStyleOptions);
+        
+        // Initialize style options
+        updateStyleOptions();
+        
+        // Voice Preview
+        const previewBtn = document.getElementById('previewBtn');
+        const previewText = document.getElementById('previewText');
+        const previewPlayer = document.getElementById('previewPlayer');
+        const audioPlayer = document.getElementById('audioPlayer');
+        
+        previewBtn.addEventListener('click', function() {
+            if (previewText.value.trim() === '') {
+                alert('Please enter some text to preview.');
+                return;
+            }
+            
+            previewBtn.disabled = true;
+            previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating...';
+            
+            // Build preview request
+            const formData = new FormData();
+            formData.append('text', previewText.value);
+            formData.append('model', modelSelect.value);
+            formData.append('voice_id', document.getElementById('voice_id').value);
+            formData.append('speed', document.getElementById('speed').value);
+            formData.append('style', styleSelect.value);
+            
+            if (styleSelect.value === 'custom') {
+                formData.append('custom_style', document.getElementById('custom_style').value);
+            }
+            
+            if (document.getElementById('emotion').value) {
+                formData.append('emotion', document.getElementById('emotion').value);
+            }
+            
+            // Send preview request to the preview API
+            fetch("{{ url_for('generate_preview') }}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Attempt to get error message from response body as JSON
+                    return response.json().then(data => {
+                        // Throw error with message from JSON or default
+                        throw new Error(data.message || `Server error: ${response.status}`);
+                    }).catch(() => {
+                        // If JSON parsing fails or it's not JSON, throw generic error
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    });
+                }
+                return response.blob(); // If response is OK, get audio data as blob
+            })
+            .then(blob => {
+                // Create an object URL for the audio blob
+                const audioUrl = URL.createObjectURL(blob);
+                
+                // Update audio player source and show it
+                audioPlayer.src = audioUrl;
+                previewPlayer.classList.remove('hidden');
+                
+                // Optional: Auto-play the audio
+                // audioPlayer.play(); 
+            })
+            .catch(error => {
+                // Handle any errors during fetch or processing
+                console.error("Preview Error:", error);
+                alert('Error generating preview: ' + error.message);
+            })
+            .finally(() => {
+                // Always restore button state regardless of success/failure
+                previewBtn.disabled = false;
+                previewBtn.textContent = 'Preview Voice';
+            });
+        });
+    });
+</script>
+{% endblock %} 

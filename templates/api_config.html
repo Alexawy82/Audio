@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Doc2Audiobook{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title mb-4">
+                    <i class="fas fa-cog me-2"></i>Settings
+                </h2>
+                
+                <form action="{{ url_for('api_config') }}" method="post" class="needs-validation" novalidate>
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-key me-2"></i>API Configuration
+                        </h5>
+                        <div class="mb-3">
+                            <label for="api_key" class="form-label">OpenAI API Key</label>
+                            <div class="input-group">
+                                <input type="password" 
+                                       class="form-control" 
+                                       id="api_key" 
+                                       name="api_key" 
+                                       value="{{ api_key if api_key else '' }}"
+                                       required>
+                                <button class="btn btn-outline-secondary" type="button" id="toggleApiKey">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Your API key is stored securely and never shared.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-folder me-2"></i>Storage Settings
+                        </h5>
+                        <div class="mb-3">
+                            <label for="output_dir" class="form-label">Output Directory</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="output_dir" 
+                                   name="output_dir" 
+                                   value="{{ output_dir }}"
+                                   required>
+                            <div class="form-text">
+                                Directory where converted audiobooks will be saved.
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="cache_dir" class="form-label">Cache Directory</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="cache_dir" 
+                                   name="cache_dir" 
+                                   value="{{ cache_dir }}"
+                                   required>
+                            <div class="form-text">
+                                Directory for storing temporary files and cache.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-sliders-h me-2"></i>Conversion Settings
+                        </h5>
+                        <div class="mb-3">
+                            <label for="max_chunk_size" class="form-label">Maximum Chunk Size</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="max_chunk_size" 
+                                   name="max_chunk_size" 
+                                   value="{{ max_chunk_size }}"
+                                   min="1000"
+                                   max="5000"
+                                   required>
+                            <div class="form-text">
+                                Maximum number of characters per text chunk (1000-5000).
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="default_voice" class="form-label">Default Voice</label>
+                            <select class="form-select" id="default_voice" name="default_voice" required>
+                                {% for voice in available_voices %}
+                                    <option value="{{ voice }}" {% if voice == default_voice %}selected{% endif %}>
+                                        {{ voice|title }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="default_model" class="form-label">Default Model</label>
+                            <select class="form-select" id="default_model" name="default_model" required>
+                                {% for model in available_models %}
+                                    <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>
+                                        {{ model|upper }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Preview Section -->
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-headphones me-2"></i>Test Voice Settings
+                                </h6>
+                                <div class="mb-3">
+                                    <label for="preview_text" class="form-label">Preview Text</label>
+                                    <textarea class="form-control" 
+                                              id="preview_text" 
+                                              rows="3"
+                                              placeholder="Enter text to preview the voice settings...">Hello! This is a preview of how your text will sound.</textarea>
+                                </div>
+                                <button type="button" class="btn btn-outline-primary" id="previewButton">
+                                    <i class="fas fa-play me-2"></i>Play Preview
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i>Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Voice Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="audio-player">
+                    <audio id="previewAudio" controls class="w-100">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const forms = document.querySelectorAll('.needs-validation');
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+    
+    // Toggle API key visibility
+    const toggleApiKey = document.getElementById('toggleApiKey');
+    const apiKeyInput = document.getElementById('api_key');
+    
+    toggleApiKey.addEventListener('click', () => {
+        const type = apiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        apiKeyInput.setAttribute('type', type);
+        toggleApiKey.querySelector('i').classList.toggle('fa-eye');
+        toggleApiKey.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+    
+    // Preview functionality
+    const previewButton = document.getElementById('previewButton');
+    const previewText = document.getElementById('preview_text');
+    const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+    const previewAudio = document.getElementById('previewAudio');
+    
+    previewButton.addEventListener('click', async () => {
+        const text = previewText.value.trim();
+        if (!text) {
+            alert('Please enter some text to preview.');
+            return;
+        }
+        
+        const settings = {
+            model: document.getElementById('default_model').value,
+            voice: document.getElementById('default_voice').value
+        };
+        
+        try {
+            previewButton.disabled = true;
+            previewButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating Preview...';
+            
+            const response = await fetch('/preview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: text,
+                    settings: settings
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Convert hex string to binary data
+                const binaryData = new Uint8Array(data.audio.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                const blob = new Blob([binaryData], { type: 'audio/mpeg' });
+                const url = URL.createObjectURL(blob);
+                
+                previewAudio.src = url;
+                previewModal.show();
+                previewAudio.play();
+            } else {
+                alert('Error generating preview: ' + data.error);
+            }
+        } catch (error) {
+            alert('Error generating preview: ' + error.message);
+        } finally {
+            previewButton.disabled = false;
+            previewButton.innerHTML = '<i class="fas fa-play me-2"></i>Play Preview';
+        }
+    });
+    
+    // Clean up URL object when modal is closed
+    document.getElementById('previewModal').addEventListener('hidden.bs.modal', () => {
+        if (previewAudio.src) {
+            URL.revokeObjectURL(previewAudio.src);
+            previewAudio.src = '';
+        }
+    });
+});
+</script>
+{% endblock %} 
